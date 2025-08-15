@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import tkinter
 import tkinter.font
-from Downloading_Web_Pages.browser import URL
+from c2_Downloading_Web_Pages.browser import URL
 
 WIDTH, HEIGHT = 800,600
 HSTEP, VSTEP = 13, 18
@@ -88,11 +88,13 @@ class Layout:
 		if not self.line: return
 		metrics = [font.metrics() for x, word, font in self.line]
 		max_ascent = max([metric["ascent"] for metric in metrics])
+		#print(f"max_ascent: {max_ascent}")
 		base_line = self.cursor_y + 1.25 * max_ascent
 		for x, word, font in self.line:
 			y = base_line - font.metrics("ascent")
 			self.display_list.append((x, y, word, font))
 		max_descent = max([metric["descent"] for metric in metrics])
+		#print(f"max_descent: {max_descent}")
 		self.cursor_y = base_line + 1.25 * max_descent
 		self.cursor_x = HSTEP
 		self.line = []
@@ -145,8 +147,8 @@ class Browser:
 		self.canvas.delete("all")
 		for x, y, word, font in self.display_list:
 			if y > self.scroll + HEIGHT: continue
-			if y + VSTEP < self.scroll: continue
-			self.canvas.create_text(x, y - self.scroll, text=word, font=font)
+			if y + font.metrics("linespace") < self.scroll: continue
+			self.canvas.create_text(x, y - self.scroll, text=word, font=font, anchor="nw")
 	def load(self, url):
 		body = url.request()
 		tokens = lex(body)
