@@ -4,11 +4,16 @@ import ssl
 class URL:
 	def __init__(self, url):
 		self.scheme, url = url.split("://", 1)
-		assert self.scheme in ["http", "https"]
+		assert self.scheme in ["http", "https", "file"]
 		if self.scheme == "http":
 			self.port = 80
 		if self.scheme == "https":
 			self.port = 443
+		if self.scheme == "file":
+			self.port = None
+			self.path = url
+			self.host = None
+			return
 		if "/" not in url:
 			url = url + "/"
 		self.host, url = url.split("/", 1)
@@ -16,7 +21,30 @@ class URL:
 		if ":" in self.host:
 			self.host, port = self.host.split(":", 1)
 			self.port = int(port)
+
 	def request(self):
+		if self.scheme == "file":
+			return self.request_file()
+		else:
+			return self.request_http()
+
+	def request_file(self):
+		"""ローカルファイルの読み込み"""
+		try:
+			file_path = self.path
+			if file_path.startswith('/') and len(file_path) > 1 and file_path[2] == ':':
+				file_path = file_path[1:]
+			
+			with open(file_path, 'r', encoding='utf-8') as f:
+				content = f.read()
+			#print(content)
+			return content
+		except FileNotFoundError:
+			raise Exception(f"File not found: {file_path}")
+		except Exception as e:
+			raise Exception(f"Error reading file: {e}")
+
+	def request_http(self):
 		s = socket.socket(
 			family=socket.AF_INET,
             type=socket.SOCK_STREAM,

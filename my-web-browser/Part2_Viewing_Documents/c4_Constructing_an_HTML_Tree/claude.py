@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import tkinter
 import tkinter.font
-from c2_Downloading_Web_Pages.browser import URL
+from Part1_Loading_Pages.c2_Downloading_Web_Pages.browser import URL
 
 WIDTH, HEIGHT = 800,600
 HSTEP, VSTEP = 13, 18
@@ -44,27 +44,6 @@ class HTMLParser:
 			"area", "base", "br", "col", "embed", "hr", "img", "input",
 			"link", "meta", "source", "track", "wbr"
 		]
-		self.HEAD_TAGS = [
-			"base", "basefont", "bgsound", "noscript",
-        	"link", "meta", "title", "style", "script",
-		]
-	
-	def implicit_tags(self, tag):
-		while True:
-			open_tags = [node.tag for node in self.unfinished]
-			if open_tags == [] and tag != "html":
-				self.add_tag("html")
-			elif open_tags == ["html"] \
-				and tag not in ["head", "body", "/html"]:
-				if tag in self.HEAD_TAGS:
-					self.add_tag("head")
-				else:
-					self.add_tag("body")
-			elif open_tags == ["html", "head"] \
-				and tag not in ["/head"] + self.HEAD_TAGS:
-				self.add_tag("/head")
-			else:
-				break
 	
 	def get_attributes(self, text):
 		parts = text.split()
@@ -90,7 +69,7 @@ class HTMLParser:
 				text = ""
 			elif c == ">":
 				in_tag = False
-				self.add_tag(text)
+				self.add_tag(text)  # Fixed: was add_text, should be add_tag
 				text = ""
 			else:
 				text += c
@@ -100,34 +79,30 @@ class HTMLParser:
 	
 	def add_text(self, text):
 		if text.isspace(): return
-		self.implicit_tags(None)
 		# Handle case when there's no parent yet
 		if not self.unfinished: return
-		parent = self.unfinished[-1] if self.unfinished else None
+		parent = self.unfinished[-1]
 		node = Text(text, parent)
 		parent.children.append(node)
 
 	def add_tag(self, tag):
 		tag, attributes = self.get_attributes(tag)
 		if tag.startswith("!"): return
-		self.implicit_tags(tag)
 		if tag.startswith("/"):
 			if len(self.unfinished) == 1: return
 			node = self.unfinished.pop()
-			parent = self.unfinished[-1] if self.unfinished else None
+			parent = self.unfinished[-1]
 			parent.children.append(node)
 		elif tag in self.SELF_CLOSING_TAGS:
 			parent = self.unfinished[-1]
-			node = Element(tag, attributes, parent)
+			node = Element(tag, attributes, parent)  # Fixed: added attributes
 			parent.children.append(node)
 		else:
 			parent = self.unfinished[-1] if self.unfinished else None
-			node = Element(tag, attributes, parent)
+			node = Element(tag, attributes, parent)  # Fixed: added attributes
 			self.unfinished.append(node)
 	
 	def finish(self):
-		if not self.unfinished:
-			self.implicit_tags(None)
 		while len(self.unfinished) > 1:
 			node = self.unfinished.pop()
 			parent = self.unfinished[-1]
@@ -164,8 +139,6 @@ class Layout:
 		self.line = []
 		
 		self.recurse(tree)
-		#for tok in tokens:
-		#	self.token(tok)
 		self.flush()
 	
 	def open_tag(self, tag):
@@ -192,9 +165,13 @@ class Layout:
 			self.size += 2
 		elif tag == "big":
 			self.size -= 4
+		elif tag == "p":
+			self.flush()
+			self.cursor_y += VSTEP
 
 	def recurse(self, tree):
-		if tree is None: return
+		if tree is None:
+			return
 		if isinstance(tree, Text):
 			for word in tree.text.split():
 				self.word(word)
@@ -203,33 +180,6 @@ class Layout:
 			for child in tree.children:
 				self.recurse(child)
 			self.close_tag(tree.tag)
-	
-	#def token(self, tok):
-	#	if isinstance(tok, Text):
-	#		for word in tok.text.split():
-	#			self.word(word)
-	#	elif isinstance(tok, Tag):
-	#		if tok.tag == "i":
-	#			self.style = "italic"
-	#		elif tok.tag == "/i":
-	#			self.style = "roman"
-	#		elif tok.tag == "b":
-	#			self.weight = "bold"
-	#		elif tok.tag == "/b":
-	#			self.weight = "normal"
-	#		elif tok.tag == "small":
-	#			self.size -= 2
-	#		elif tok.tag == "/small":
-	#			self.size += 2
-	#		elif tok.tag == "big":
-	#			self.size += 4
-	#		elif tok.tag == "/big":
-	#			self.size -= 4
-	#		elif tok.tag == "br":
-	#			self.flush()
-	#		elif tok.tag == "/p":
-	#			self.flush()
-	#			self.cursor_y += VSTEP
 
 	def word(self, word):
 		font = get_font(self.size, self.weight, self.style)
@@ -245,36 +195,14 @@ class Layout:
 		if not self.line: return
 		metrics = [font.metrics() for x, word, font in self.line]
 		max_ascent = max([metric["ascent"] for metric in metrics])
-		#print(f"max_ascent: {max_ascent}")
 		base_line = self.cursor_y + 1.25 * max_ascent
 		for x, word, font in self.line:
 			y = base_line - font.metrics("ascent")
 			self.display_list.append((x, y, word, font))
 		max_descent = max([metric["descent"] for metric in metrics])
-		#print(f"max_descent: {max_descent}")
 		self.cursor_y = base_line + 1.25 * max_descent
 		self.cursor_x = HSTEP
 		self.line = []
-
-
-#def lex(body):
-#	out = []
-#	buffer = ""
-#	in_tag = False
-#	for c in body:
-#		if c == "<":
-#			in_tag = True
-#			if buffer: out.append(Text(buffer))
-#			buffer = ""
-#		elif c == ">":
-#			in_tag = False
-#			if buffer: out.append(Element(buffer))
-#			buffer = ""
-#		else:
-#			buffer += c
-#	if not in_tag and buffer:
-#		out.append(Text(buffer))
-#	return out
 
 class Browser:
 	def __init__(self):
@@ -306,10 +234,10 @@ class Browser:
 			if y > self.scroll + HEIGHT: continue
 			if y + font.metrics("linespace") < self.scroll: continue
 			self.canvas.create_text(x, y - self.scroll, text=word, font=font, anchor="nw")
+	
 	def load(self, url):
 		body = url.request()
 		self.nodes = HTMLParser(body).parse()
-		#tokens = lex(body)
 		self.display_list = Layout(self.nodes).display_list
 		self.draw()
 
